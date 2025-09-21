@@ -62,6 +62,51 @@ export interface AboutData {
   }>;
 }
 
+export interface AgriculturalSupportData {
+  '3rd_section_subheading': string;
+  '3rd_section_heading': string;
+  '3rd_section_button_text': string;
+  '3rd_section_button_link': {
+    title: string;
+    url: string;
+    target: string;
+  };
+  '3rd_section_image': {
+    url: string;
+    alt: string;
+  };
+  '3rd_section_columns': Array<{
+    acf_fc_layout: string;
+    '3rd_section_column_head': string;
+    '3rd_section_column_description': string;
+    '3rd_section_button_text': string;
+    '3rd_section_button_link': {
+      title: string;
+      url: string;
+      target: string;
+    };
+  }>;
+}
+
+export interface SolutionsData {
+  '4th_section_subheading': string;
+  '4th_section_heading': string;
+  '4th_section_cards': Array<{
+    acf_fc_layout: string;
+    cards_number: string;
+    card_heading: string;
+    card_link: {
+      title: string;
+      url: string;
+      target: string;
+    };
+    card_image: {
+      url: string;
+      alt: string;
+    };
+  }>;
+}
+
 export interface WordPressHeaderResponse {
   id: number;
   date: string;
@@ -451,6 +496,190 @@ export async function fetchAboutData(): Promise<AboutData> {
     };
     
     console.log('Using fallback about data:', fallbackData);
+    return fallbackData;
+  }
+}
+
+export async function fetchAgriculturalSupportData(): Promise<AgriculturalSupportData> {
+  try {
+    console.log('Fetching agricultural support data from URL:', `${WORDPRESS_API_URL}pages?slug=home`);
+    
+    const response = await fetch(`${WORDPRESS_API_URL}pages?slug=home`, {
+      next: { revalidate: 3600 }, // Revalidate every hour
+    });
+
+    console.log('Agricultural support response status:', response.status);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch agricultural support data: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Agricultural support raw API response:', data);
+    
+    if (data.length === 0) {
+      throw new Error('No agricultural support data found');
+    }
+
+    const pageData = data[0];
+    console.log('Agricultural support page data:', pageData);
+    console.log('Agricultural support ACF data:', pageData.acf);
+    
+    // Check if ACF data exists
+    if (!pageData.acf) {
+      throw new Error('No ACF data found');
+    }
+    
+    const result = {
+      '3rd_section_subheading': pageData.acf['3rd_section_subheading'] || '',
+      '3rd_section_heading': pageData.acf['3rd_section_heading'] || '',
+      '3rd_section_button_text': pageData.acf['3rd_section_button_text'] || '',
+      '3rd_section_button_link': pageData.acf['3rd_section_button_link'] || { title: '', url: '#', target: '' },
+      '3rd_section_image': {
+        url: pageData.acf['3rd_section_image']?.url || '',
+        alt: pageData.acf['3rd_section_image']?.alt || '',
+      },
+      '3rd_section_columns': pageData.acf['3rd_section_columns'] && Array.isArray(pageData.acf['3rd_section_columns']) ? pageData.acf['3rd_section_columns'].map((column: any) => ({
+        acf_fc_layout: column.acf_fc_layout || '3rd_section_column_list',
+        '3rd_section_column_head': column['3rd_section_column_head'] || '',
+        '3rd_section_column_description': column['3rd_section_column_description'] || '',
+        '3rd_section_button_text': column['3rd_section_button_text'] || '',
+        '3rd_section_button_link': column['3rd_section_button_link'] || { title: '', url: '#', target: '' },
+      })) : [],
+    };
+    
+    console.log('Agricultural support processed result:', result);
+    console.log('Agricultural support result keys:', Object.keys(result));
+    console.log('Agricultural support heading in result:', result['3rd_section_heading']);
+    
+    return result;
+  } catch (error) {
+    console.error('Error fetching agricultural support data:', error);
+    
+    // Return fallback data
+    const fallbackData = {
+      '3rd_section_subheading': 'Agricultural Support',
+      '3rd_section_heading': 'Smart Farming for a Changing Planet',
+      '3rd_section_button_text': 'Read More',
+      '3rd_section_button_link': { title: '', url: '#', target: '' },
+      '3rd_section_image': {
+        url: 'http://agro-rajaguru.local/wp-content/uploads/2025/09/h1-3.webp',
+        alt: 'Agricultural Support',
+      },
+      '3rd_section_columns': [
+        {
+          acf_fc_layout: '3rd_section_column_list',
+          '3rd_section_column_head': 'Sustainability First',
+          '3rd_section_column_description': 'We prioritize eco-friendly practices that protect natural resources and ensure long-term agricultural productivity for future generations.',
+          '3rd_section_button_text': 'Read More',
+          '3rd_section_button_link': { title: '', url: '#', target: '' },
+        },
+        {
+          acf_fc_layout: '3rd_section_column_list',
+          '3rd_section_column_head': 'Farmer Approach',
+          '3rd_section_column_description': 'Every solution we offer is designed to support farmers — helping them increase yields, reduce risk, and grow with confidence.',
+          '3rd_section_button_text': 'Read More',
+          '3rd_section_button_link': { title: '', url: '#', target: '' },
+        },
+        {
+          acf_fc_layout: '3rd_section_column_list',
+          '3rd_section_column_head': 'Innovation That Works',
+          '3rd_section_column_description': 'We embrace smart technologies and proven methods that bring efficiency, precision, and progress to modern farming.',
+          '3rd_section_button_text': 'Read More',
+          '3rd_section_button_link': { title: '', url: '#', target: '' },
+        },
+      ],
+    };
+    
+    console.log('Using fallback agricultural support data:', fallbackData);
+    return fallbackData;
+  }
+}
+
+export async function fetchSolutionsData(): Promise<SolutionsData> {
+  try {
+    console.log('Fetching solutions data from URL:', `${WORDPRESS_API_URL}pages?slug=home`);
+    
+    const response = await fetch(`${WORDPRESS_API_URL}pages?slug=home`, {
+      next: { revalidate: 3600 }, // Revalidate every hour
+    });
+
+    console.log('Solutions response status:', response.status);
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch solutions data: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('Solutions raw API response:', data);
+    
+    if (data.length === 0) {
+      throw new Error('No solutions data found');
+    }
+
+    const pageData = data[0];
+    console.log('Solutions page data:', pageData);
+    console.log('Solutions ACF data:', pageData.acf);
+
+    const result = {
+      '4th_section_subheading': pageData.acf['4th_section_subheading'] || '',
+      '4th_section_heading': pageData.acf['4th_section_heading'] || '',
+      '4th_section_cards': pageData.acf['4th_section_cards'] && Array.isArray(pageData.acf['4th_section_cards']) ? pageData.acf['4th_section_cards'].map((card: any) => ({
+        acf_fc_layout: card.acf_fc_layout || '4th_section_card_list',
+        cards_number: card.cards_number || '',
+        card_heading: card.card_heading || '',
+        card_link: card.card_link || { title: '', url: '#', target: '' },
+        card_image: {
+          url: card.card_image?.url || '',
+          alt: card.card_image?.alt || '',
+        },
+      })) : [],
+    };
+
+    console.log('Solutions processed result:', result);
+    return result;
+  } catch (error) {
+    console.error('Error fetching solutions data:', error);
+    
+    // Return fallback data
+    const fallbackData = {
+      '4th_section_subheading': 'Farm Solutions',
+      '4th_section_heading': 'What Our an Agricultural Company Offers',
+      '4th_section_cards': [
+        {
+          acf_fc_layout: '4th_section_card_list',
+          cards_number: '01',
+          card_heading: 'Seeds & Planting Material',
+          card_link: { title: '', url: '#', target: '' },
+          card_image: {
+            url: 'http://agro-rajaguru.local/wp-content/uploads/2025/09/VerdaAgro-Agriculture-Companies-Organic-Farms-WordPress-Theme-Preview-ThemeForest-09-22-2025_04_38_AM.png',
+            alt: 'Seeds & Planting Material',
+          },
+        },
+        {
+          acf_fc_layout: '4th_section_card_list',
+          cards_number: '02',
+          card_heading: 'Fertilizers & Soil Solutions',
+          card_link: { title: '', url: '#', target: '' },
+          card_image: {
+            url: 'http://agro-rajaguru.local/wp-content/uploads/2025/09/fe1b4715-3212-4ee7-a9d2-0b717c8d5309.png',
+            alt: 'Fertilizers & Soil Solutions',
+          },
+        },
+        {
+          acf_fc_layout: '4th_section_card_list',
+          cards_number: '03',
+          card_heading: 'Crop Protection Products',
+          card_link: { title: '', url: '#', target: '' },
+          card_image: {
+            url: 'http://agro-rajaguru.local/wp-content/uploads/2025/09/VerdaAgro-Agriculture-Companies-Organic-Farms-WordPress-Theme-Preview-ThemeForest-09-22-2025_04_39_AM.png',
+            alt: 'Crop Protection Products',
+          },
+        },
+      ],
+    };
+    
+    console.log('Using fallback solutions data:', fallbackData);
     return fallbackData;
   }
 }
