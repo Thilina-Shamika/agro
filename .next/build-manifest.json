@@ -1,0 +1,26 @@
+{
+  "pages": {
+    "/_app": []
+  },
+  "devFiles": [],
+  "ampDevFiles": [],
+  "polyfillFiles": [
+    "static/chunks/1a190_next_dist_build_polyfills_polyfill-nomodule.js"
+  ],
+  "lowPriorityFiles": [
+    "static/development/_ssgManifest.js",
+    "static/development/_buildManifest.js"
+  ],
+  "rootMainFiles": [
+    "static/chunks/[turbopack]_browser_dev_hmr-client_hmr-client_ts_095d6250._.js",
+    "static/chunks/1a190_next_dist_compiled_react-dom_c2eb863c._.js",
+    "static/chunks/1a190_next_dist_compiled_next-devtools_index_ed74c5e6.js",
+    "static/chunks/1a190_next_dist_compiled_657f89f0._.js",
+    "static/chunks/1a190_next_dist_client_a9cd7b55._.js",
+    "static/chunks/1a190_next_dist_25e914d6._.js",
+    "static/chunks/1a190_@swc_helpers_cjs_bf6f3b98._.js",
+    "static/chunks/Documents_headless agro_a0ff3932._.js",
+    "static/chunks/turbopack-Documents_headless agro_9bf369b3._.js"
+  ],
+  "ampFirstPages": []
+}
