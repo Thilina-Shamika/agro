@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Raleway, Poppins } from "next/font/google";
 import "./globals.css";
 import Header from "@/components/Header";
+import SiteFooter from "@/components/SiteFooter";
 import { fetchHeaderData } from "@/lib/wordpress";
 
 const raleway = Raleway({
@@ -34,9 +35,10 @@ export default async function RootLayout({
         className={`${raleway.variable} ${poppins.variable} antialiased`}
       >
         <Header data={headerData} />
-        <main>
+              <main>
           {children}
         </main>
+              <SiteFooter />
       </body>
     </html>
   );

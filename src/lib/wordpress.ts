@@ -165,6 +165,35 @@ export interface TheFarmData {
   image_gallery: Array<{ url: string; alt: string }>;
 }
 
+export interface FooterData {
+  footer_logo?: { url: string; alt: string };
+  footer_description: string;
+  social_media: Array<{ name: string; url: string }>;
+  footer_menu: Array<{ name: string; url: string }>;
+  copyright_text: string;
+  design_by_text: string;
+  important_links: Array<{ text: string; url: string }>;
+  background_image?: { url: string; alt: string };
+  contact_box: Array<{ type: string; info: string }>;
+}
+
+export interface ProductsData {
+  products_page_subheading: string;
+  products_page_heading: string;
+  image_banner?: { url: string; alt: string };
+}
+
+export interface ProductListItem {
+  slug: string;
+  title: string;
+  image?: { url: string; alt: string };
+  short_description: string;
+}
+
+export interface ProductDetail extends ProductListItem {
+  description: string;
+}
+
 export interface ContactData {
   page_title?: string;
   contact_us_subheading?: string;
@@ -936,5 +965,84 @@ export async function fetchTheFarmData(): Promise<TheFarmData> {
   } catch (e) {
     console.error('Error fetching the-farm:', e);
     return { page_subheading: 'Farming technology', heading: 'Our Farm', banner_image: undefined, secondary_heading: '', description: '', image_gallery: [] };
+  }
+}
+
+export async function fetchFooterData(): Promise<FooterData> {
+  try {
+    const response = await fetch(`${WORDPRESS_API_URL}footer`, process.env.NODE_ENV === 'production' ? { next: { revalidate: 600 } } : { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Failed to fetch footer: ${response.status}`);
+    const data = await response.json();
+    const entry = data[0];
+    const acf = entry?.acf || {};
+    return {
+      footer_logo: acf.footer_logo ? { url: acf.footer_logo.url, alt: acf.footer_logo.alt || 'Footer logo' } : undefined,
+      footer_description: acf.footer_description || '',
+      social_media: Array.isArray(acf.social_media) ? acf.social_media.map((s: any) => ({ name: s.social_media_name || '', url: toNextInternalLink(s.social_media_link?.url || '#') })) : [],
+      footer_menu: Array.isArray(acf.footer_menu) ? acf.footer_menu.map((m: any) => ({ name: m.footer_menu_item_name || '', url: toNextInternalLink(m.footer_menu_item_link?.url || '#') })) : [],
+      copyright_text: acf.copyright_text || '',
+      design_by_text: acf.design_by_text || '',
+      important_links: Array.isArray(acf.important_links) ? acf.important_links.map((l: any) => ({ text: l.important_link_text || '', url: toNextInternalLink(l.important_link?.url || '#') })) : [],
+      background_image: acf.background_image ? { url: acf.background_image.url, alt: acf.background_image.alt || 'Footer background' } : undefined,
+      contact_box: Array.isArray(acf.contact_box) ? acf.contact_box.map((c: any) => ({ type: c.contact_type || '', info: (c.contact_info || '').replace(/\r?\n/g, ' ') })) : [],
+    };
+  } catch (e) {
+    console.error('Error fetching footer:', e);
+    return { footer_description: '', social_media: [], footer_menu: [], copyright_text: '', design_by_text: '', important_links: [], contact_box: [] };
+  }
+}
+
+export async function fetchProductsData(): Promise<ProductsData> {
+  try {
+    const response = await fetch(`${WORDPRESS_API_URL}pages?slug=our-products`, process.env.NODE_ENV === 'production' ? { next: { revalidate: 600 } } : { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Failed to fetch products page: ${response.status}`);
+    const data = await response.json();
+    const page = data[0];
+    const acf = page?.acf || {};
+    return {
+      products_page_subheading: acf.products_page_subheading || 'Products',
+      products_page_heading: acf.products_page_heading || (page?.title?.rendered ?? 'Our Products'),
+      image_banner: acf.image_banner ? { url: acf.image_banner.url, alt: acf.image_banner.alt || 'Products banner' } : undefined,
+    };
+  } catch (e) {
+    console.error('Error fetching products page:', e);
+    return { products_page_subheading: 'Products', products_page_heading: 'Our Products', image_banner: undefined };
+  }
+}
+
+export async function fetchProductList(): Promise<ProductListItem[]> {
+  try {
+    const response = await fetch(`${WORDPRESS_API_URL}product`, process.env.NODE_ENV === 'production' ? { next: { revalidate: 600 } } : { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Failed to fetch product list: ${response.status}`);
+    const data = await response.json();
+    return data.map((p: any) => ({
+      slug: p.slug,
+      title: p.acf?.product_name || p.title?.rendered || '',
+      image: p.acf?.product_image ? { url: p.acf.product_image.url, alt: p.acf.product_image.alt || '' } : undefined,
+      short_description: p.acf?.product_short_description || '',
+    }));
+  } catch (e) {
+    console.error('Error fetching product list:', e);
+    return [];
+  }
+}
+
+export async function fetchProductBySlug(slug: string): Promise<ProductDetail | null> {
+  try {
+    const response = await fetch(`${WORDPRESS_API_URL}product?slug=${slug}`, process.env.NODE_ENV === 'production' ? { next: { revalidate: 600 } } : { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Failed to fetch product ${slug}: ${response.status}`);
+    const data = await response.json();
+    const p = data[0];
+    if (!p) return null;
+    return {
+      slug: p.slug,
+      title: p.acf?.product_name || p.title?.rendered || '',
+      image: p.acf?.product_image ? { url: p.acf.product_image.url, alt: p.acf.product_image.alt || '' } : undefined,
+      short_description: p.acf?.product_short_description || '',
+      description: p.acf?.product_description || '',
+    };
+  } catch (e) {
+    console.error('Error fetching product detail:', e);
+    return null;
   }
 }
