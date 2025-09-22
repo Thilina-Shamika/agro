@@ -1,5 +1,29 @@
 // WordPress API utilities
 const WORDPRESS_API_URL = process.env.WORDPRESS_API_URL || 'http://agro-rajaguru.local/wp-json/wp/v2/';
+const WORDPRESS_ORIGIN = (() => {
+  try {
+    return new URL(WORDPRESS_API_URL).origin;
+  } catch {
+    return 'http://agro-rajaguru.local';
+  }
+})();
+
+function toNextInternalLink(url: string | undefined | null): string {
+  if (!url || url === '#') return '#';
+  try {
+    const parsed = new URL(url);
+    // If this links to our WP site, convert to pathname for Next internal routing
+    if (parsed.origin === WORDPRESS_ORIGIN) {
+      // Treat home links as '/'
+      return parsed.pathname === '/' ? '/' : parsed.pathname;
+    }
+    // External link: keep as-is
+    return url;
+  } catch {
+    // Not a full URL, probably already relative
+    return url.startsWith('/') ? url : `/${url}`;
+  }
+}
 
 export interface HeaderData {
   logo: {
@@ -105,6 +129,58 @@ export interface SolutionsData {
       alt: string;
     };
   }>;
+}
+
+export interface AboutPageData {
+  about_subheading: string;
+  about_heading: string;
+  banner_image?: { url: string; alt: string };
+  first_section_subheading: string;
+  first_section_heading: string;
+  first_section_main_description: string;
+  first_section_sub_description: string;
+  first_section_image?: { url: string; alt: string };
+  number_counter: Array<{ number: string; number_description: string }>;
+  vision?: string;
+  mission?: string;
+}
+
+export interface TestimonialsData {
+  page_heading: string;
+  page_subheading: string;
+  banner_image?: { url: string; alt: string };
+  testimonials: Array<{
+    customer_name: string;
+    profile_pic?: { url: string; alt: string };
+    testimonials_texts: string;
+  }>;
+}
+
+export interface TheFarmData {
+  page_subheading: string;
+  heading: string;
+  banner_image?: { url: string; alt: string };
+  secondary_heading: string;
+  description: string;
+  image_gallery: Array<{ url: string; alt: string }>;
+}
+
+export interface ContactData {
+  page_title?: string;
+  contact_us_subheading?: string;
+  contact_heading: string;
+  contact_boxes: Array<{
+    acf_fc_layout: string;
+    contact_type: string;
+    info: string;
+    contact_button_text: string;
+    contact_button_link: { title: string; url: string; target: string };
+  }>;
+  contact_form_subheading: string;
+  contact_form_heading: string;
+  contact_form_description: string;
+  google_map_address: { title: string; url: string; target: string };
+  banner_image?: { url: string; alt: string };
 }
 
 export interface WordPressHeaderResponse {
@@ -221,9 +297,11 @@ export interface WordPressHeaderResponse {
 
 export async function fetchHeaderData(): Promise<HeaderData> {
   try {
-    const response = await fetch(`${WORDPRESS_API_URL}header`, {
-      next: { revalidate: 3600 }, // Revalidate every hour
-    });
+    const response = await fetch(`${WORDPRESS_API_URL}header`,
+      process.env.NODE_ENV === 'production'
+        ? { next: { revalidate: 60 } }
+        : { cache: 'no-store' }
+    );
 
     if (!response.ok) {
       throw new Error(`Failed to fetch header data: ${response.status}`);
@@ -242,9 +320,18 @@ export async function fetchHeaderData(): Promise<HeaderData> {
         url: headerData.acf.logo.url,
         alt: headerData.acf.logo.alt || 'Logo',
       },
-      navigation: headerData.acf.navigation,
+      navigation: headerData.acf.navigation.map((item) => ({
+        ...item,
+        menu_item_link: {
+          ...item.menu_item_link,
+          url: toNextInternalLink(item.menu_item_link?.url),
+        },
+      })),
       button_text: headerData.acf.button_text,
-      button_link: headerData.acf.button_link,
+      button_link: {
+        ...headerData.acf.button_link,
+        url: toNextInternalLink(headerData.acf.button_link?.url),
+      },
     };
   } catch (error) {
     console.error('Error fetching header data:', error);
@@ -259,7 +346,7 @@ export async function fetchHeaderData(): Promise<HeaderData> {
         {
           acf_fc_layout: 'navigation_items',
           menu_item_name: 'Home',
-          menu_item_link: { title: '', url: '#', target: '' },
+          menu_item_link: { title: '', url: '/', target: '' },
         },
         {
           acf_fc_layout: 'navigation_items',
@@ -284,11 +371,11 @@ export async function fetchHeaderData(): Promise<HeaderData> {
         {
           acf_fc_layout: 'navigation_items',
           menu_item_name: 'Contact Us',
-          menu_item_link: { title: '', url: '#', target: '' },
+          menu_item_link: { title: '', url: '/contact-us', target: '' },
         },
       ],
       button_text: 'Get in touch',
-      button_link: { title: '', url: '#', target: '' },
+      button_link: { title: '', url: '/', target: '' },
     };
   }
 }
@@ -681,5 +768,173 @@ export async function fetchSolutionsData(): Promise<SolutionsData> {
     
     console.log('Using fallback solutions data:', fallbackData);
     return fallbackData;
+  }
+}
+
+export async function fetchContactData(): Promise<ContactData> {
+  try {
+    const response = await fetch(`${WORDPRESS_API_URL}pages?slug=contact-us`, {
+      next: { revalidate: 3600 },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch contact data: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (!Array.isArray(data) || data.length === 0) {
+      throw new Error('No contact data found');
+    }
+
+    const pageData = data[0];
+    const acf = pageData.acf || {};
+
+    const result: ContactData = {
+      page_title: (pageData?.title?.rendered as string) || 'Contact',
+      contact_us_subheading: acf.contact_us_subheading || 'Keep in touch',
+      contact_heading: acf.contact_heading || 'Contacts',
+      contact_boxes: (acf.contact_boxes || []).map((b: any) => ({
+        acf_fc_layout: b.acf_fc_layout || 'contact_info',
+        contact_type: b.contact_type || '',
+        info: b.info || '',
+        contact_button_text: b.contact_button_text || '',
+        contact_button_link: b.contact_button_link || { title: '', url: '#', target: '' },
+      })),
+      contact_form_subheading: acf.contact_form_subheading || 'Drop us a line',
+      contact_form_heading: acf.contact_form_heading || 'Let’s Start Working Together. Get in Touch',
+      contact_form_description: acf.contact_form_description || 'Your email address will not be published. Required fields are marked *',
+      google_map_address: acf.google_map_address || { title: '', url: '#', target: '' },
+      banner_image: acf.banner_image ? { url: acf.banner_image.url, alt: acf.banner_image.alt || 'Contact banner' } : undefined,
+    };
+
+    return result;
+  } catch (error) {
+    console.error('Error fetching contact data:', error);
+    return {
+      page_title: 'Contact',
+      contact_us_subheading: 'Keep in touch',
+      contact_heading: 'Contacts',
+      contact_boxes: [
+        {
+          acf_fc_layout: 'contact_info',
+          contact_type: 'Mail Us:',
+          info: 'info@rajaguru.com',
+          contact_button_text: 'Send an Email',
+          contact_button_link: { title: '', url: '#', target: '' },
+        },
+        {
+          acf_fc_layout: 'contact_info',
+          contact_type: 'Call Us:',
+          info: '+94 112 345 6789',
+          contact_button_text: 'Call us Daily',
+          contact_button_link: { title: '', url: '#', target: '' },
+        },
+        {
+          acf_fc_layout: 'contact_info',
+          contact_type: 'Visit Us',
+          info: 'Our shop address,\nCity,\nCountry',
+          contact_button_text: 'Our location',
+          contact_button_link: { title: '', url: '#', target: '' },
+        },
+      ],
+      contact_form_subheading: 'Drop us a line',
+      contact_form_heading: 'Let’s Start Working Together. Get in Touch',
+      contact_form_description: 'Your email address will not be published. Required fields are marked *',
+      google_map_address: { title: '', url: '#', target: '' },
+    };
+  }
+}
+
+export async function fetchAboutPageData(): Promise<AboutPageData> {
+  try {
+    const response = await fetch(`${WORDPRESS_API_URL}pages?slug=about-us`, process.env.NODE_ENV === 'production' ? { next: { revalidate: 600 } } : { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Failed to fetch about page: ${response.status}`);
+    const data = await response.json();
+    const pageData = data[0];
+    const acf = pageData?.acf || {};
+    return {
+      about_subheading: acf.about_subheading || 'Our Story',
+      about_heading: acf.about_heading || (pageData?.title?.rendered ?? 'About Us'),
+      banner_image: acf.banner_image ? { url: acf.banner_image.url, alt: acf.banner_image.alt || 'About banner' } : undefined,
+      first_section_subheading: acf['1st_section_subheading'] || 'about company',
+      first_section_heading: acf['1st_section_heading'] || '',
+      first_section_main_description: acf['1st_section_main_description'] || '',
+      first_section_sub_description: acf['1st_section_sub_description'] || '',
+      first_section_image: acf['1st_section_image'] ? { url: acf['1st_section_image'].url, alt: acf['1st_section_image'].alt || '' } : undefined,
+      number_counter: Array.isArray(acf.number_counter) ? acf.number_counter.map((n: any) => ({ number: String(n.number || ''), number_description: n.number_description || '' })) : [],
+      vision: acf.vision || '',
+      mission: acf.mission || '',
+    };
+  } catch (e) {
+    console.error('Error fetching about page:', e);
+    return {
+      about_subheading: 'Our Story',
+      about_heading: 'About Us',
+      banner_image: undefined,
+      first_section_subheading: 'about company',
+      first_section_heading: 'Modern Solutions for Traditional Challenges',
+      first_section_main_description: 'We don’t just grow crops — we grow trust, opportunity, and a better future. We are dedicated to supporting farmers, enhancing food security, and promoting sustainable agriculture.',
+      first_section_sub_description: 'With years of experience and a deep understanding of local and global challenges, we provide high-quality seeds, modern farming solutions, expert field support, and agri-tech innovations that empower growers to increase productivity and protect natural resources. Our mission is rooted in more than just farming — it’s about building partnerships, preserving the land, and helping communities thrive.',
+      first_section_image: undefined,
+      number_counter: [
+        { number: '20k', number_description: 'Hectares under sustainable cultivation' },
+        { number: '98%', number_description: 'Customer Satisfaction based on service feedback' },
+        { number: '15k', number_description: 'Farmers partnered with across regions' },
+      ],
+      vision: 'To be a sustainable plantation leader, nourishing people with innovative and value-driven products.',
+      mission: 'At Rajaguru Plantations, we grow quality crops and eco-friendly products through responsible farming and technology. We empower communities, protect nature, and create value for all.',
+    };
+  }
+}
+
+export async function fetchTestimonialsData(): Promise<TestimonialsData> {
+  try {
+    const response = await fetch(`${WORDPRESS_API_URL}pages?slug=testimonials`, process.env.NODE_ENV === 'production' ? { next: { revalidate: 600 } } : { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Failed to fetch testimonials: ${response.status}`);
+    const data = await response.json();
+    const page = data[0];
+    const acf = page?.acf || {};
+    const testimonials = Array.isArray(acf.testimonials)
+      ? acf.testimonials.map((t: any) => ({
+          customer_name: t.customer_name || '',
+          profile_pic: t.profile_pic ? { url: t.profile_pic.url, alt: t.profile_pic.alt || t.customer_name || '' } : undefined,
+          testimonials_texts: (t.testimonials_texts || '').replace(/<[^>]+>/g, ''),
+        }))
+      : [];
+    return {
+      page_heading: acf.page_heading || (page?.title?.rendered ?? 'Testimonials'),
+      page_subheading: acf.page_subheading || 'Testimonials',
+      banner_image: acf.banner_image ? { url: acf.banner_image.url, alt: acf.banner_image.alt || 'Testimonials banner' } : undefined,
+      testimonials,
+    };
+  } catch (e) {
+    console.error('Error fetching testimonials:', e);
+    return {
+      page_heading: 'WHAT PEOPLE SAYS ABOUT AGRO',
+      page_subheading: 'Testimonials',
+      banner_image: undefined,
+      testimonials: [],
+    };
+  }
+}
+
+export async function fetchTheFarmData(): Promise<TheFarmData> {
+  try {
+    const response = await fetch(`${WORDPRESS_API_URL}pages?slug=the-farm`, process.env.NODE_ENV === 'production' ? { next: { revalidate: 600 } } : { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Failed to fetch the-farm: ${response.status}`);
+    const data = await response.json();
+    const page = data[0];
+    const acf = page?.acf || {};
+    return {
+      page_subheading: acf.page_subheading || '',
+      heading: acf.heading || (page?.title?.rendered ?? ''),
+      banner_image: acf.banner_image ? { url: acf.banner_image.url, alt: acf.banner_image.alt || 'The Farm banner' } : undefined,
+      secondary_heading: acf.secondary_heading || '',
+      description: acf.description || '',
+      image_gallery: Array.isArray(acf.image_gallery) ? acf.image_gallery.map((img: any) => ({ url: img.url, alt: img.alt || '' })) : [],
+    };
+  } catch (e) {
+    console.error('Error fetching the-farm:', e);
+    return { page_subheading: 'Farming technology', heading: 'Our Farm', banner_image: undefined, secondary_heading: '', description: '', image_gallery: [] };
   }
 }
